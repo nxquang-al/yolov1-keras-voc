@@ -3,28 +3,63 @@ import os
 import cv2 as cv
 import numpy as np
 from models.model_tiny_yolov1 import model_tiny_yolov1
-from keras.engine import Input
+from keras import Input
 from keras.models import Model
 
-parser = argparse.ArgumentParser(description='Use Tiny-Yolov1 To Detect Picture.')
-parser.add_argument('weights_path', help='Path to model weights.')
-parser.add_argument('image_path', help='Path to detect image.')
+parser = argparse.ArgumentParser(description="Use Tiny-Yolov1 To Detect Picture.")
+parser.add_argument("weights_path", help="Path to model weights.")
+parser.add_argument("image_path", help="Path to detect image.")
 
-classes_name = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
-                'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse',
-                'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train',
-                'tvmonitor']
+classes_name = [
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "diningtable",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "pottedplant",
+    "sheep",
+    "sofa",
+    "train",
+    "tvmonitor",
+]
 
 
 class Tiny_Yolov1(object):
-
     def __init__(self, weights_path, input_path):
         self.weights_path = weights_path
         self.input_path = input_path
-        self.classes_name = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
-                             'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse',
-                             'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train',
-                             'tvmonitor']
+        self.classes_name = [
+            "aeroplane",
+            "bicycle",
+            "bird",
+            "boat",
+            "bottle",
+            "bus",
+            "car",
+            "cat",
+            "chair",
+            "cow",
+            "diningtable",
+            "dog",
+            "horse",
+            "motorbike",
+            "person",
+            "pottedplant",
+            "sheep",
+            "sofa",
+            "train",
+            "tvmonitor",
+        ]
 
     def predict(self):
         image = cv.imread(self.input_path)
@@ -32,7 +67,7 @@ class Tiny_Yolov1(object):
         image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
         image = cv.resize(image, input_shape[1:3])
         image = np.reshape(image, input_shape)
-        image = image / 255.
+        image = image / 255.0
         inputs = Input(input_shape[1:4])
         outputs = model_tiny_yolov1(inputs)
         model = Model(inputs=inputs, outputs=outputs)
@@ -52,7 +87,9 @@ def yolo_head(feats):
 
     # TODO: Repeat_elements and tf.split doesn't support dynamic splits.
     conv_width_index = np.tile(np.expand_dims(conv_width_index, 0), [conv_dims[0], 1])
-    conv_width_index = np.reshape(np.transpose(conv_width_index), [conv_dims[0] * conv_dims[1]])
+    conv_width_index = np.reshape(
+        np.transpose(conv_width_index), [conv_dims[0] * conv_dims[1]]
+    )
     conv_index = np.transpose(np.stack([conv_height_index, conv_width_index]))
     conv_index = np.reshape(conv_index, [conv_dims[0], conv_dims[1], 1, 2])
 
@@ -74,7 +111,7 @@ def xywh2minmax(xy, wh):
 def iou(pred_mins, pred_maxes, true_mins, true_maxes):
     intersect_mins = np.maximum(pred_mins, true_mins)
     intersect_maxes = np.minimum(pred_maxes, true_maxes)
-    intersect_wh = np.maximum(intersect_maxes - intersect_mins, 0.)
+    intersect_wh = np.maximum(intersect_maxes - intersect_mins, 0.0)
     intersect_areas = intersect_wh[..., 0] * intersect_wh[..., 1]
 
     pred_wh = pred_maxes - pred_mins
@@ -107,7 +144,9 @@ def _main(args):
 
     box_classes = np.argmax(predict_scores, axis=-1)  # 7 * 7 * 2
     box_class_scores = np.max(predict_scores, axis=-1)  # 7 * 7 * 2
-    best_box_class_scores = np.max(box_class_scores, axis=-1, keepdims=True)  # 7 * 7 * 1
+    best_box_class_scores = np.max(
+        box_class_scores, axis=-1, keepdims=True
+    )  # 7 * 7 * 1
 
     box_mask = box_class_scores >= best_box_class_scores  # ? * 7 * 7 * 2
 
@@ -143,10 +182,12 @@ def _main(args):
             for j in range(nms_mask.shape[1]):
                 for k in range(nms_mask.shape[2]):
                     if filter_mask[i, j, k, 0] == 1:
-                        iou_score = iou(box_xy_min[max_i, max_j, max_k, :],
-                                        box_xy_max[max_i, max_j, max_k, :],
-                                        box_xy_min[i, j, k, :],
-                                        box_xy_max[i, j, k, :])
+                        iou_score = iou(
+                            box_xy_min[max_i, max_j, max_k, :],
+                            box_xy_max[max_i, max_j, max_k, :],
+                            box_xy_min[i, j, k, :],
+                            box_xy_max[i, j, k, :],
+                        )
                         if iou_score > 0.2:
                             filter_mask[i, j, k, 0] = 0
         predict_trust *= filter_mask  # 7 * 7 * 2 * 1
@@ -164,18 +205,26 @@ def _main(args):
         for j in range(detect_shape[1]):
             for k in range(detect_shape[2]):
                 if nms_mask[i, j, k, 0]:
-                    cv.rectangle(image, (int(box_xy_min[i, j, k, 0]), int(box_xy_min[i, j, k, 1])),
-                                 (int(box_xy_max[i, j, k, 0]), int(box_xy_max[i, j, k, 1])),
-                                 (0, 0, 255))
-                    cv.putText(image, classes_name[box_classes[i, j, k, 0]],
-                               (int(box_xy_min[i, j, k, 0]), int(box_xy_min[i, j, k, 1])),
-                               1, 1, (0, 0, 255))
+                    cv.rectangle(
+                        image,
+                        (int(box_xy_min[i, j, k, 0]), int(box_xy_min[i, j, k, 1])),
+                        (int(box_xy_max[i, j, k, 0]), int(box_xy_max[i, j, k, 1])),
+                        (0, 0, 255),
+                    )
+                    cv.putText(
+                        image,
+                        classes_name[box_classes[i, j, k, 0]],
+                        (int(box_xy_min[i, j, k, 0]), int(box_xy_min[i, j, k, 1])),
+                        1,
+                        1,
+                        (0, 0, 255),
+                    )
 
     image = cv.resize(image, (origin_shape[1], origin_shape[0]))
-    cv.imshow('image', image)
+    cv.imshow("image", image)
     cv.waitKey(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     _main(parser.parse_args())
     # _main(parser.parse_args(['my-tiny-yolov1.hdf5', 'C:/Users/JY/Desktop/test.jpg']))
